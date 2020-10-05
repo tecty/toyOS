@@ -10,7 +10,7 @@ all: $(NAME)
 
 
 %.o: %.asm
-	${CROSS}as -o $@ $^
+	${CROSS}as -o $@ $^ -ggdb
 
 %.o: %.c
 	${CROSS}gcc ${CFLAGS} -c -o $@ $^

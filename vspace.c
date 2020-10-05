@@ -31,17 +31,17 @@ word_t kernelPT[BIT(9 + 5)] ALIGN_BSS(BIT(12));
 /**
  * generate the top level page table entry 
 */
-word_t pgde_new(word_t paddr)
+word_t pge_new(word_t paddr)
 {
     paddr = paddr & 0xFFFFF000;
-    paddr |= 0x0741;
+    paddr |= 0b11;
     return paddr;
 }
 
 word_t pte_new(word_t paddr, enum mair_types mtype)
 {
     paddr = paddr & 0xFFFFF000;
-    paddr |= 0x0743;
+    paddr |= 0x741;
     paddr |= mtype << 2;
     return paddr;
 }
@@ -49,30 +49,34 @@ word_t pte_new(word_t paddr, enum mair_types mtype)
 static inline word_t get_PT_addr(word_t pt_idx)
 {
     word_t ret = (word_t)kernelPT;
-    ret += pt_idx << 9;
+    ret += pt_idx << 12;
     return ret;
 }
 
 static inline word_t get_PT_index(word_t pt_idx, word_t entry)
 {
     // this has same effect as define, will optimsed out to constant by compiler
-    return (pt_idx << 9) + entry;
+    return (pt_idx << 12) + entry;
 }
 
-void dumpMap(word_t vaddr, word_t padddr)
+void dumpMap(const char *pre, word_t index, word_t vaddr, word_t padddr, word_t value)
 {
-
-    print("vaddr: ");
+    print(pre);
+    print(" - index: ");
+    putSizeTHex(index);
+    print("\tvaddr: ");
     putSizeTHex(vaddr);
     print(" -> paddr: ");
     putSizeTHex(padddr);
+    print(" = ");
+    putSizeTHex(value);
     print("\n");
 }
 
 void map_kerenlPGD(word_t vaddr, word_t padddr)
 {
-    // dumpMap((vaddr >> 23) & MASK(9), padddr);
-    kernelPGD[(vaddr >> 23) & MASK(9)] = pgde_new(padddr);
+    dumpMap("GPT", (vaddr >> 23) & MASK(9), vaddr, padddr, pge_new(padddr));
+    kernelPGD[(vaddr >> 23) & MASK(9)] = pge_new(padddr);
 }
 
 /**
@@ -80,7 +84,7 @@ void map_kerenlPGD(word_t vaddr, word_t padddr)
 */
 void map_kernelPT(word_t vaddr, word_t padddr, word_t pt_idx, enum mair_types mtype)
 {
-    // dumpMap(get_PT_index(pt_idx, (vaddr >> 14) & MASK(9)), padddr);
+    dumpMap("PUT", get_PT_index(pt_idx, (vaddr >> 14) & MASK(9)), vaddr, padddr, pte_new(padddr, mtype));
     kernelPT[get_PT_index(pt_idx, (vaddr >> 14) & MASK(9))] = pte_new(padddr, mtype);
 }
 
@@ -107,6 +111,9 @@ void vspace_boot()
     */
     MSR("MAIR_EL1", 0xff440c0400);
     page_table_boot();
+
+    putSizeTHex(get_PT_addr(1));
+    print("\n");
 
     putSizeTHex(kernelPGD);
     print("\n");
