@@ -4,6 +4,7 @@ SECTIONS
     . = 0x00000000; 
     
     . = 0x40000000;
+    kernel_start =  . ;
     .startup . : { startup.o(.text) }
     arm_vector_table = .;
     .vectors : {
@@ -23,4 +24,5 @@ SECTIONS
     . = ALIGN(8);
     . = . + 0x1000; /* 4kB of stack memory */
     stack_top = .;
+    kernel_end =  . ;
 }

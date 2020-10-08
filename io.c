@@ -25,7 +25,6 @@ void putSizeT(size_t i)
 
 void putSizeTHex(size_t i)
 {
-    print("0x");
     for (int k = 15; k >= 0; k--)
     {
         if (k == 7)

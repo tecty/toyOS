@@ -43,9 +43,13 @@ void boot()
 {
 	// disable interrupts
 	asm volatile("msr daifset, #0xf");
-	// point the el1 vector table
-	// MSR("vbar_el1", (word_t)arm_vector_table);
-	// enable async exception
+	asm volatile(
+		"ic iallu\n\t"
+		"tlbi vmalle1is\n\t"
+		"dsb ish\n\t");
+	// enable fpu
+	// MSR("cpacr_el1", 0b11 << 20);
+	MSR("mdscr_el1", 0);
 
 	vspace_boot();
 }

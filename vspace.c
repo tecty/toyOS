@@ -2,6 +2,24 @@
 #include "util.h"
 #include "io.h"
 
+#define PAGE_TABLE_ENTRIES BIT(9)
+#define BLOCK_ENTRY 0b01
+#define TABLE_ENTRY 0b11
+#define N_PAGE_TABLE BIT(9)
+#define MAIR_INDEX(index) (index << 2)
+#define PT_PADDR_MASK ((-1) << 12)
+
+#define l0_PT_START 39
+#define l1_PT_START 30
+#define l2_PT_START 21
+#define l3_PT_START 12
+
+
+
+// have to fake an array to get the pointer value
+extern char kernel_start[1];
+extern char kernel_end[1];
+extern char stack_top[1];
 /*
  * Memory types are defined in Memory Attribute Indirection Register.
  *  - nGnRnE Device non-Gathering, non-Reordering, No Early write acknowledgement
@@ -24,78 +42,81 @@ enum mair_types
     ALIGN(n)         \
     SECTION(".bss.aligned")
 
-word_t kernelPGD[BIT(9)] ALIGN_BSS(BIT(12));
-// 32 more page table should boot
-word_t kernelPT[BIT(9 + 5)] ALIGN_BSS(BIT(12));
+word_t pageTables[N_PAGE_TABLE][BIT(9)] ALIGN_BSS(BIT(12));
+word_t pageTable_brk = 0;
+word_t *kernelPGD;
 
-/**
- * generate the top level page table entry 
-*/
-word_t pge_new(word_t paddr)
+// void dumpMap(const char *pre, word_t index, word_t vaddr, word_t padddr, word_t value)
+// {
+//     print(pre);
+//     print(" - index: ");
+//     putSizeTHex(index);
+//     print("\tvaddr: ");
+//     putSizeTHex(vaddr);
+//     print(" -> paddr: ");
+//     putSizeTHex(padddr);
+//     print(" = ");
+//     putSizeTHex(value);
+//     print("\n");
+// }
+
+static inline word_t mask_get_index(word_t right, word_t addr)
 {
-    paddr = paddr & 0xFFFFF000;
-    paddr |= 0b11;
-    return paddr;
+    return (addr >> right) & MASK(9);
 }
 
-word_t pte_new(word_t paddr, enum mair_types mtype)
+word_t *alloc_pt()
 {
-    paddr = paddr & 0xFFFFF000;
-    paddr |= 0x741;
-    paddr |= mtype << 2;
-    return paddr;
+    if (pageTable_brk == N_PAGE_TABLE)
+    {
+        return NULL;
+    }
+    return (word_t *)&pageTables[pageTable_brk++];
 }
 
-static inline word_t get_PT_addr(word_t pt_idx)
+static inline word_t pte_new(word_t *pt_paddr, enum mair_types mtype, word_t entry_type)
 {
-    word_t ret = (word_t)kernelPT;
-    ret += pt_idx << 12;
-    return ret;
+    entry_type = ((word_t)pt_paddr) | MAIR_INDEX(mtype) | (entry_type & 0b11);
+    print("==> PTE_NEW ");
+    putSizeTHex(entry_type);
+    ENDL;
+
+    return entry_type;
 }
 
-static inline word_t get_PT_index(word_t pt_idx, word_t entry)
+/* The region has identical va and pa */
+void map_kernel_identical(word_t *l2_pt)
 {
-    // this has same effect as define, will optimsed out to constant by compiler
-    return (pt_idx << 12) + entry;
-}
+    size_t entry_index = 0;
+    // print("helloword\n");
 
-void dumpMap(const char *pre, word_t index, word_t vaddr, word_t padddr, word_t value)
-{
-    print(pre);
-    print(" - index: ");
-    putSizeTHex(index);
-    print("\tvaddr: ");
-    putSizeTHex(vaddr);
-    print(" -> paddr: ");
-    putSizeTHex(padddr);
-    print(" = ");
-    putSizeTHex(value);
-    print("\n");
-}
-
-void map_kerenlPGD(word_t vaddr, word_t padddr)
-{
-    dumpMap("GPT", (vaddr >> 23) & MASK(9), vaddr, padddr, pge_new(padddr));
-    kernelPGD[(vaddr >> 23) & MASK(9)] = pge_new(padddr);
-}
-
-/**
-    Map to actual block to prove concept 
-*/
-void map_kernelPT(word_t vaddr, word_t padddr, word_t pt_idx, enum mair_types mtype)
-{
-    dumpMap("PUT", get_PT_index(pt_idx, (vaddr >> 14) & MASK(9)), vaddr, padddr, pte_new(padddr, mtype));
-    kernelPT[get_PT_index(pt_idx, (vaddr >> 14) & MASK(9))] = pte_new(padddr, mtype);
+    for (size_t idmap_addr = (word_t)kernel_start; idmap_addr <= (word_t)kernel_end; idmap_addr += (1 << l2_PT_START))
+    {
+        if (entry_index >= BIT(9))
+        {
+            print("kerenl is too big to fit in 1 level 1 PT\n");
+            return;
+        }
+        // DUMP_PTR((void *)mask_get_index(l2_PT_START, idmap_addr));
+        word_t target_addr = (word_t)kernel_start;
+        target_addr += entry_index << l2_PT_START;
+        l2_pt[mask_get_index(l2_PT_START, idmap_addr)] = pte_new((word_t *)target_addr, NORMAL, BLOCK_ENTRY);
+        entry_index++;
+    }
 }
 
 static inline void page_table_boot()
 {
-    // for uart devices
-    map_kerenlPGD(0x09000000, get_PT_addr(0));
-    map_kernelPT(0x09000000, 0x09000000, 0, DEVICE_nGnRnE);
-    // for kernel codes
-    map_kerenlPGD(0x40000000, get_PT_addr(1));
-    map_kernelPT(0x40000000, 0x40000000, 1, NORMAL);
+    kernelPGD = alloc_pt();
+    word_t *l1_page_table = alloc_pt();
+    kernelPGD[mask_get_index(l0_PT_START, (word_t)kernel_start)] = pte_new(l1_page_table, NORMAL, TABLE_ENTRY);
+    word_t *l2_page_table = alloc_pt();
+    l1_page_table[mask_get_index(l1_PT_START, (word_t)kernel_start)] = pte_new(l2_page_table, NORMAL, TABLE_ENTRY);
+    map_kernel_identical(l2_page_table);
+    print("\n==> page_table_inited\n");
+    DUMP_PTR(kernelPGD);
+    DUMP_PTR(l1_page_table);
+    DUMP_PTR(l2_page_table);
 }
 
 void vspace_boot()
@@ -110,19 +131,18 @@ void vspace_boot()
      *  0xff = 0b11111111    NORMAL
     */
     MSR("MAIR_EL1", 0xff440c0400);
+    // page_table_boot();
+    // putSizeTHex(get_PT_addr(1));
+    // print("\n");
+    // putSizeTHex(kernelPGD);
+    // print("\n");
     page_table_boot();
-
-    putSizeTHex(get_PT_addr(1));
-    print("\n");
-
-    putSizeTHex(kernelPGD);
-    print("\n");
-    putSizeTHex(kernelPT);
 
     // enable mmu
     // 4GB space 4KB granularity
     enable_mmu_el1((word_t)kernelPGD, (word_t)kernelPGD, 0x3520);
     while (1)
     {
+        /* code */
     }
 }

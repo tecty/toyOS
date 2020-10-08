@@ -10,10 +10,15 @@
 #define _AARCH64_H
 
 #include "types.h"
-
+/*
+ * Reference: ARM® Architecture Reference Manual ARMv8, for ARMv8-A architecture profile
+ */
+#include <stdint.h>
 /* CurrentEL, Current Exception Level */
 #define CURRENT_EL_MASK 0x3
 #define CURRENT_EL_SHIFT 2
+
+#define BM(base, count, val) (((val) & ((1UL << (count)) - 1)) << (base))
 
 /* DAIF, Interrupt Mask Bits */
 #define DAIF_DBG_BIT (1 << 3) /* Debug mask bit */
@@ -70,10 +75,6 @@
                            :     \
                            :     \
                            : "memory")
-/*
- * Reference: ARM® Architecture Reference Manual ARMv8, for ARMv8-A architecture profile
- */
-#include <stdint.h>
 
 /* CurrentEL, Current Exception Level
 	EL, bits [3:2]
@@ -398,6 +399,10 @@ static inline void set_ttbr0_el0(uint64_t ttbr0_el0)
 */
 static inline void enable_mmu_el1(uint64_t ttbr0_el1, uint64_t ttbr1_el1, uint64_t tcr_el1)
 {
+    asm volatile(
+        "tlbi vmalle1is\n\t"
+        "isb\n\t"
+        "dsb sy\n\t");
     MSR("TTBR0_EL1", ttbr0_el1);
     MSR("TTBR1_EL1", ttbr1_el1);
     MSR("TCR_EL1", tcr_el1);
