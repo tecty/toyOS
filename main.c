@@ -1,73 +1,75 @@
-#include "io.h"
-#include "asm.h"
-#include "aarch64.h"
-#include "vspace.h"
-// Data register of first UART (PL011)
+/*
+ * Copyright (C) 2018 bzt (bztsrc@github)
+ *
+ * Permission is hereby granted, free of charge, to any person
+ * obtaining a copy of this software and associated documentation
+ * files (the "Software"), to deal in the Software without
+ * restriction, including without limitation the rights to use, copy,
+ * modify, merge, publish, distribute, sublicense, and/or sell copies
+ * of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be
+ * included in all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+ * EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+ * MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+ * NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+ * HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ *
+ */
 
-/* need a fake array to get the pointer from the linker script */
-extern char data_start[1];
-extern char data_end[1];
-extern char bss_start[1];
-extern char bss_end[1];
-extern char arm_vector_table[1];
+#include "uart.h"
+#include "mmu.h"
+#include "types.h"
 
-size_t data[] = {1, 2, 3, 4, 5};
+#define KERNEL_UART0_DR ((volatile unsigned int *)0xFFFFFFFFFFE00000)
+#define KERNEL_UART0_FR ((volatile unsigned int *)0xFFFFFFFFFFE00018)
 
-// /**
-//  * Copy the content from start to end to the dest
-// */
-// void copy(void *start, void *end, void *dest)
-// {
-// }
+extern char __bss_start[1];
+extern char __bss_end[1];
 
-// /**
-//  * Copy the content from start to end to the dest
-// */
-// void copy_size_t(size_t *start, size_t *end, size_t *dest)
-// {
-// 	end = (void *)((size_t)end & (!((1 << 8) - 1)));
-// 	for (size_t *index = start; index != end; index++)
-// 	{
-// 		*index = *dest++;
-// 	}
-// }
-
-// /**
-//  * set all the content from start to end to zero
-//  */
-// void memClear(void *start, void *end)
-// {
-// }
-
-void boot()
+void memset(void *begin, void *end, word_t val)
 {
-	// disable interrupts
-	asm volatile("msr daifset, #0xf");
-	asm volatile(
-		"ic iallu\n\t"
-		"tlbi vmalle1is\n\t"
-		"dsb ish\n\t");
-	// enable fpu
-	// MSR("cpacr_el1", 0b11 << 20);
-	MSR("mdscr_el1", 0);
-
-	vspace_boot();
+    for (word_t *p = (word_t *)begin; p != (word_t *)end; p++)
+    {
+        *p = val;
+    }
 }
 
-int main()
+void main()
 {
-	// putPtr(arm_vector_table);
-	boot();
+    memset(__bss_start, __bss_end, 0);
 
-	// word_t spsr;
-	// MRS("spsr_el1", spsr);
-	// putSizeT(spsr);
-	// MRS("spsr_el0", spsr);
-	// putSizeT(spsr);
+    // set up serial console
+    uart_init();
 
-	// turrning off the system
-	// comment this to halt for human interupt
-	print("\nHello world!\n");
-	system_off();
-	return 0;
+    // set up paging
+    mmu_init();
+
+    // test mapping
+    uart_puts("LO\t");
+
+    char *s = "HI\r\n";
+    // test mapping
+    while (*s)
+    {
+        /* wait until we can send */
+        do
+        {
+            asm volatile("nop");
+        } while (*KERNEL_UART0_FR & 0x20);
+        /* write the character to the buffer */
+        *KERNEL_UART0_DR = *s++;
+    }
+
+    // echo everything back
+    while (1)
+    {
+        uart_send(uart_getc());
+    }
 }
