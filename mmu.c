@@ -30,6 +30,9 @@
 
 #define PAGESIZE 4096
 
+#define L0_START 30
+#define L1_START 21
+#define L2_START 12
 // granularity
 #define PT_PAGE 0b11  // 4k granule
 #define PT_BLOCK 0b01 // 2M granule
@@ -53,8 +56,8 @@
 #define N_PAGE_TABLE BIT(9)
 
 // get addresses from linker
-extern volatile unsigned char _data;
-extern volatile unsigned char _end;
+extern char __data_start[1];
+// extern volatile unsigned char _end;
 
 typedef word_t pte_t;
 pte_t pageTables[N_PAGE_TABLE][BIT(9)] ALIGN_BSS(BIT(12));
@@ -117,8 +120,8 @@ word_t *kernelPGD_Lo;
  */
 void mmu_init()
 {
-    unsigned long data_page = (unsigned long)&_data / PAGESIZE;
-    unsigned long r, b, *paging = (unsigned long *)&_end;
+    word_t data_page = (word_t)__data_start << L2_START;
+    word_t r, b;
 
     /* create MMU translation tables at _end */
     kernelPGD_Hi = alloc_pt();
@@ -142,7 +145,7 @@ void mmu_init()
                PT_MEM;         // normal memory
 
     // identity L2 2M blocks
-    b = MMIO_BASE >> 21;
+    b = MMIO_BASE >> L1_START;
     // skip 0th, as we're about to map it by L3
     for (r = 1; r < 512; r++)
         l1_lo[r] = (unsigned long)((r << 21)) |                  // physical address
@@ -154,7 +157,7 @@ void mmu_init()
 
     // identity L3
     for (r = 0; r < 512; r++)
-        l2_lo[r] = (unsigned long)(r * PAGESIZE) |                         // physical address
+        l2_lo[r] = (unsigned long)(r << L2_START) |                        // physical address
                    PT_PAGE |                                               // map 4k
                    PT_AF |                                                 // accessed flag
                    PT_USER |                                               // non-privileged
@@ -169,6 +172,7 @@ void mmu_init()
                             PT_KERNEL |       // privileged
                             PT_ISH |          // inner shareable
                             PT_MEM;           // normal memory
+    // TODO: add a map kernel device helper
     word_t *hi_l3 = alloc_pt();
     hi_l2[MASK(9)] = (word_t)hi_l3 |      // physical address
                      PT_PAGE |            // we have area in it mapped by pages
