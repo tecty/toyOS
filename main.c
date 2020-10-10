@@ -32,6 +32,7 @@
 #define KERNEL_UART0_FR ((volatile unsigned int *)0xFFFFFFFFFFE00018)
 
 extern char __bss_start[1];
+extern char __data_start[1];
 extern char __bss_end[1];
 extern char __vector_start[1];
 
@@ -50,10 +51,8 @@ void boot()
 
     // set up serial console
     uart_init();
-
     // set the execption handler
     MSR("vbar_el1", (word_t)__vector_start);
-
     // set up paging
     mmu_init();
 }

@@ -29,5 +29,14 @@
 void uart_init();
 void uart_send(unsigned int c);
 char uart_getc();
-void uart_puts(char *s);
+void uart_puts(const char *s);
 void uart_hex(word_t d);
+void printf(char *fmt, ...);
+
+#define KLOG(...)                                                          \
+    do                                                                     \
+    {                                                                      \
+        printf("[DEBUG: %s@%s:%u] => ", __FILE__, __FUNCTION__, __LINE__); \
+        printf(__VA_ARGS__);                                               \
+        printf("\n");                                                      \
+    } while (0);

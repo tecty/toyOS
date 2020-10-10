@@ -90,39 +90,51 @@ _halt:  wfe
     // for failsafe, halt this core too
     b       _halt
 
+.macro ventry entry_number label
+.align 7
+    mov     x0, \entry_number
+    b       \label
+.endm
+
+
 .section .vectors 
-    // synchronous
-    .align  7
-    mov     x0, #0
-    mrs     x1, esr_el1
-    mrs     x2, elr_el1
-    mrs     x3, spsr_el1
-    mrs     x4, far_el1
-    b       exc_handler
-
-    // IRQ
-    .align  7
-    mov     x0, #1
-    mrs     x1, esr_el1
-    mrs     x2, elr_el1
-    mrs     x3, spsr_el1
-    mrs     x4, far_el1
-    b       exc_handler
-
-    // FIQ
-    .align  7
-    mov     x0, #2
-    mrs     x1, esr_el1
-    mrs     x2, elr_el1
-    mrs     x3, spsr_el1
-    mrs     x4, far_el1
-    b       exc_handler
-
-    // SError
-    .align  7
-    mov     x0, #3
-    mrs     x1, esr_el1
-    mrs     x2, elr_el1
-    mrs     x3, spsr_el1
-    mrs     x4, far_el1
-    b       exc_handler
+    ventry #0   exc_handler 
+    ventry #1   exc_handler 
+    ventry #2   exc_handler 
+    ventry #3   exc_handler 
+    
+    ventry #4   exc_handler 
+    ventry #5   exc_handler 
+    ventry #6   exc_handler 
+    ventry #7   exc_handler 
+    
+    ventry #8   exc_handler 
+    ventry #9   exc_handler 
+    ventry #10  exc_handler 
+    ventry #11  exc_handler 
+    
+    ventry #12  exc_handler 
+    ventry #13  exc_handler 
+    ventry #14  exc_handler 
+    ventry #15  exc_handler 
+    
+    // // synchronous
+    // .align  7
+    // mov     x0, #0
+    // b       exc_handler
+// 
+    // // IRQ
+    // .align  7
+    // mov     x0, #1
+    // b       exc_handler
+// 
+    // // FIQ
+    // .align  7
+    // mov     x0, #2
+    // b       exc_handler
+// 
+    // // SError
+    // .align  7
+    // mov     x0, #3
+    // b       exc_handler
+// 

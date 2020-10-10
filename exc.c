@@ -54,6 +54,9 @@ void exc_handler(word_t type)
     case 3:
         uart_puts("SError");
         break;
+    default:
+        uart_hex(type);
+        break;
     }
     uart_puts(": ");
     // decode exception type (some, not all. See ARM DDI0487B_b chapter D10.2.28)

@@ -119,7 +119,7 @@ word_t *kernelPGD_Lo;
  */
 void mmu_init()
 {
-    word_t data_page = (word_t)__data_start << L2_START;
+    word_t data_page = (word_t)__data_start >> L2_START;
     word_t r, b;
 
     /* create MMU translation tables at _end */

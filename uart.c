@@ -124,7 +124,7 @@ char uart_getc()
 /**
  * Display a string
  */
-void uart_puts(char *s)
+void uart_puts(const char *s)
 {
     while (*s)
     {
@@ -152,5 +152,58 @@ void uart_hex(word_t i)
         tmp = tmp >> (k * 4);
         tmp &= 0b1111;
         uart(mapHex[tmp]);
+    }
+}
+
+/**
+ * Display a string
+ */
+void printf(char *fmt, ...)
+{
+    __builtin_va_list args;
+    __builtin_va_start(args, fmt);
+
+    // simple printf
+    while (*fmt != '\0')
+    {
+        char curr_c = *fmt++;
+        /* convert newline to carrige return + newline */
+        if (curr_c == '\n')
+        {
+            uart_puts("\r\n");
+        }
+        else if (curr_c == '\\')
+        {
+            uart_send(curr_c);
+        }
+        else if (curr_c == '%')
+        {
+            if (*fmt == 'c')
+            {
+                word_t c = __builtin_va_arg(args, word_t);
+                uart(c);
+            }
+            else if (*fmt == 's')
+            {
+                const char *s = __builtin_va_arg(args, const char *);
+                uart_puts(s);
+            }
+            else if (*fmt == 'u')
+            {
+                word_t w = __builtin_va_arg(args, word_t);
+                uart_hex(w);
+            }
+            else if (*fmt == 'x')
+            {
+                word_t w = __builtin_va_arg(args, word_t);
+                uart_puts("0x");
+                uart_hex(w);
+            }
+            fmt++;
+        }
+        else
+        {
+            uart_send(curr_c);
+        }
     }
 }
