@@ -47,3 +47,11 @@ clean:
 
 run: kernel.img
 	qemu-system-aarch64 -M raspi3 -kernel kernel.img -serial stdio 
+	
+qemu_none: kernel.img
+	qemu-system-aarch64 -M raspi3 -kernel kernel.img -nographic -serial none 
+
+	
+objdump: kernel.elf
+	aarch64-linux-gnu-objdump -Dlx kernel.elf | less 
+

@@ -52,7 +52,6 @@
 #define PT_NC (2 << 2)  // non-cachable
 
 #define TTBR_CNP 1
-
 #define N_PAGE_TABLE BIT(9)
 
 // get addresses from linker

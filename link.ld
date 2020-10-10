@@ -27,6 +27,11 @@ SECTIONS
 {
     . = 0x80000;
     .text : { KEEP(*(.text.boot)) *(.text .text.* .gnu.linkonce.t*) }
+    .vectors : {
+        . = ALIGN(1<< 11); 
+        PROVIDE(__vector_start = .); 
+        start.o(.vectors)
+    }
     .rodata : { *(.rodata .rodata.* .gnu.linkonce.r*) }
     . = ALIGN(4096);
     PROVIDE(__data_start = .);
@@ -42,7 +47,7 @@ SECTIONS
     . = ALIGN(4096);
     . = . + 0x1000; 
     __stack_top = . ; 
-    _end = .;
+    /* _end = .; */
 
    /DISCARD/ : { *(.comment) *(.gnu*) *(.note*) *(.eh_frame*) }
 }

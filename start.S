@@ -26,6 +26,7 @@
 .section ".text.boot"
 
 .global _start
+.global _halt 
 
 _start:
     // read cpu id, stop slave cores
@@ -33,8 +34,8 @@ _start:
     and     x1, x1, #3
     cbz     x1, 2f
     // cpu id > 0, stop
-1:  wfe
-    b       1b
+_halt:  wfe
+    b       _halt
 2:  // cpu id == 0
 
     // set stack before our code
@@ -74,6 +75,7 @@ _start:
     mov     x2, #0x0800
     movk    x2, #0x30d0, lsl #16
     msr     sctlr_el1, x2
+
     // change execution level to EL1
     mov     x2, #0x3c4
     msr     spsr_el2, x2
@@ -86,4 +88,41 @@ _start:
     // jump to C code, should not return
 4:  bl      main
     // for failsafe, halt this core too
-    b       1b
+    b       _halt
+
+.section .vectors 
+    // synchronous
+    .align  7
+    mov     x0, #0
+    mrs     x1, esr_el1
+    mrs     x2, elr_el1
+    mrs     x3, spsr_el1
+    mrs     x4, far_el1
+    b       exc_handler
+
+    // IRQ
+    .align  7
+    mov     x0, #1
+    mrs     x1, esr_el1
+    mrs     x2, elr_el1
+    mrs     x3, spsr_el1
+    mrs     x4, far_el1
+    b       exc_handler
+
+    // FIQ
+    .align  7
+    mov     x0, #2
+    mrs     x1, esr_el1
+    mrs     x2, elr_el1
+    mrs     x3, spsr_el1
+    mrs     x4, far_el1
+    b       exc_handler
+
+    // SError
+    .align  7
+    mov     x0, #3
+    mrs     x1, esr_el1
+    mrs     x2, elr_el1
+    mrs     x3, spsr_el1
+    mrs     x4, far_el1
+    b       exc_handler

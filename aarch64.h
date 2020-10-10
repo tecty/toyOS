@@ -38,3 +38,8 @@
 #define ALIGN_BSS(n) \
     ALIGN(n)         \
     SECTION(".bss.aligned")
+
+/** assembly function */
+
+// halt the system to save power
+void _halt();
